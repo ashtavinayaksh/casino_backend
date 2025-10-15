@@ -1,11 +1,78 @@
 const svc = require('../services/wallet.service');
 const nowp = require('../lib/nowpayments');
+const { getUsdRates } = require('../lib/price');
 
 async function getCoins(req, res) {
   try {
     const data = await nowp.listCoins(process.env.NOWP_API_KEY);
-    res.json(data);
+    console.log("NOWPayments raw:", JSON.stringify(data.selectedCurrencies?.slice(0, 20)));
+
+    // full array of supported coins
+    const symbols = data.selectedCurrencies || [];
+
+    // Pick top 15 common cryptos (you can reorder as you wish)
+    const topCoins = [
+      "BTC",
+      "ETH",
+      "USDTTRC20",
+      "SOL",
+      "BNBMAINNET",
+      "XRP",
+      "ADA",
+      "DOGECOIN",
+      "TRX",
+      "LTC",
+      "DOT",
+      "MATICMAINNET",
+      "AVAX",
+      "XLM",
+      "BCH"
+    ];
+
+    // map only those available in selectedCurrencies
+    const coins = topCoins
+      .filter((symbol) => symbols.includes(symbol))
+      .map((symbol) => ({
+        symbol,
+        name:
+          symbol === "BTC" ? "Bitcoin" :
+          symbol === "ETH" ? "Ethereum" :
+          symbol === "USDTTRC20" ? "Tether TRC20" :
+          symbol === "SOL" ? "Solana" :
+          symbol === "BNBMAINNET" ? "BNB" :
+          symbol === "XRP" ? "Ripple" :
+          symbol === "ADA" ? "Cardano" :
+          symbol === "DOGECOIN" ? "Dogecoin" :
+          symbol === "TRX" ? "Tron" :
+          symbol === "LTC" ? "Litecoin" :
+          symbol === "DOT" ? "Polkadot" :
+          symbol === "MATICMAINNET" ? "Polygon" :
+          symbol === "AVAX" ? "Avalanche" :
+          symbol === "XLM" ? "Stellar" :
+          symbol === "BCH" ? "Bitcoin Cash" :
+          symbol,
+        network:
+          symbol === "USDTTRC20" ? "TRON" :
+          symbol === "BNBMAINNET" ? "Binance Smart Chain" :
+          symbol === "SOL" ? "Solana" :
+          symbol === "MATICMAINNET" ? "Polygon" :
+          symbol === "AVAX" ? "Avalanche" :
+          symbol === "DOT" ? "Polkadot" :
+          symbol === "ADA" ? "Cardano" :
+          symbol === "XLM" ? "Stellar" :
+          symbol === "XRP" ? "XRP Ledger" :
+          symbol === "DOGECOIN" ? "Dogecoin" :
+          symbol === "TRX" ? "TRON" :
+          symbol === "LTC" ? "Litecoin" :
+          symbol === "BCH" ? "Bitcoin Cash" :
+          symbol === "ETH" ? "Ethereum" :
+          symbol === "BTC" ? "Bitcoin" :
+          "Unknown"
+      }));
+
+    res.json(coins);
   } catch (e) {
+    console.error("❌ getCoins error:", e.response?.data || e.message);
     res.status(500).json({ error: e.message });
   }
 }
@@ -25,15 +92,37 @@ async function getDepositAddress(req, res) {
   }
 }
 
+// async function getBalance(req, res) {
+//   const { userId } = req.params;
+//   try {
+//     const balances = await svc.getBalance(userId);
+//     res.json({ userId, balances });
+//   } catch (e) {
+//     res.status(500).json({ error: e.message });
+//   }
+// }
+
 async function getBalance(req, res) {
   const { userId } = req.params;
   try {
     const balances = await svc.getBalance(userId);
-    res.json({ userId, balances });
+    const symbols = balances.map(b => b.currency.toUpperCase());
+    const rates = await getUsdRates(symbols);
+
+    const enriched = balances.map(b => ({
+      currency: b.currency.toUpperCase(),
+      amount: b.amount,
+      usdValue: Number((b.amount * (rates[b.currency.toUpperCase()] || 0)).toFixed(2))
+    }));
+
+    const totalUsd = enriched.reduce((sum, b) => sum + b.usdValue, 0);
+
+    res.json({ userId, balances: enriched, totalUsd });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 }
+
 
 async function getTransactions(req, res) {
   const { userId } = req.params;

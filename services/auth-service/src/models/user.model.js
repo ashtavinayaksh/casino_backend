@@ -1,6 +1,14 @@
 const { mongoose } = require('../../../shared/db/connection');
 
 const UserSchema = new mongoose.Schema({
+  username: {
+    type: String,
+    unique: true,
+    required: true,
+    trim: true,
+    lowercase: true,
+    index: true,
+  },
   email: { type: String, unique: true, sparse: true },
   password: String,
   walletAddresses: [{ chain: String, address: String }],
