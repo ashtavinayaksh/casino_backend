@@ -1,4 +1,5 @@
-const { mongoose } = require('../../../shared/db/connection');
+
+const { mongoose } = require('../db/connection');
 
 const TransactionSchema = new mongoose.Schema({
   userId: { type: String, index: true },

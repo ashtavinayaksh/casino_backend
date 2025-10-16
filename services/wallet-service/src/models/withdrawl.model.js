@@ -1,4 +1,4 @@
-const { mongoose } = require('../../../shared/db/connection');
+const { mongoose } = require('../db/connection');
 
 const WithdrawalSchema = new mongoose.Schema({
   withdrawalId: { type: String, required: true, unique: true },

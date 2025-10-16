@@ -1,4 +1,4 @@
-const { mongoose } = require('../../../shared/db/connection');
+const { mongoose } = require('../db/connection');
 
 const LedgerSchema = new mongoose.Schema({
   txId: { type: String, required: true, unique: true }, // idempotency key
