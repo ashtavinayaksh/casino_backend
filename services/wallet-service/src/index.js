@@ -31,7 +31,7 @@ app.use("/api/games", require("./routes/game.routes"));
 const PORT = process.env.PORT || 7012;
 
 (async () => {
-  await connectDB(process.env.MONGO_URI);
+  await connectDB();
   app.listen(PORT, () => console.log(`wallet-service listening on :${PORT}`));
 })().catch(e => { console.error(e); process.exit(1); });
 

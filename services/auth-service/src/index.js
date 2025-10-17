@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 4000;
 
 (async () => {
   try {
-    await connectDB(process.env.MONGO_URI);
+    await connectDB();
     // await initRedis(process.env.REDIS_URL || 'redis://localhost:6379');
 
     app.use('/api/auth', routes);             // ✅ Register routes after DB connects
