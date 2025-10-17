@@ -7,6 +7,7 @@ const bodyParser = require('body-parser');
 const { connectDB } = require('@casino/shared/db/connection');
 
 const app = express();
+connectDB(process.env.MONGO_URI);
 
 // capture raw body for HMAC verification
 app.use((req, res, next) => {
