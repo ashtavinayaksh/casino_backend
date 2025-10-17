@@ -1,0 +1,5 @@
+{
+  "name": "@casino/shared",
+  "version": "1.0.0",
+  "main": "db/connection.js"
+}
