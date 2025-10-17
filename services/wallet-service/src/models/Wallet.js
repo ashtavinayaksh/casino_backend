@@ -1,4 +1,4 @@
-const { mongoose } = require('../db/connection');
+const { mongoose } = require('../../../shared/db/connection');
 
 const BalanceSchema = new mongoose.Schema({
   currency: { type: String, index: true },

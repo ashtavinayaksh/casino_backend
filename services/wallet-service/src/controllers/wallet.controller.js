@@ -1,6 +1,18 @@
 const svc = require('../services/wallet.service');
 const nowp = require('../lib/nowpayments');
 const { getUsdRates } = require('../lib/price');
+const Transaction = require('../models/Transaction');
+const User = require('../../../auth-service/src/models/user.model');
+const nodemailer = require('nodemailer');
+
+// Store OTPs temporarily (use Redis in prod)
+const pendingOtps = new Map();
+
+// Setup mailer
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+});
 
 async function getCoins(req, res) {
   try {
@@ -182,4 +194,84 @@ async function executeWithdraw(req, res) {
   }
 }
 
-module.exports = { getCoins, getDepositAddress, getBalance, getTransactions, requestWithdraw, executeWithdraw };
+async function requestWithdrawOTP(req, res) {
+  const { userId } = req.params;
+  const { currency, amount, address } = req.body;
+  if (!currency || !amount || !address)
+    return res.status(400).json({ error: 'currency, amount, address required' });
+
+  try {
+    // ✅ Create full pending transaction
+    const tx = await Transaction.create({
+      userId,
+      type: 'withdraw',
+      currency: currency.toLowerCase(),
+      amount: Number(amount),
+      status: 'pending',
+      metadata: { address },
+    });
+
+    // ✅ Generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    pendingOtps.set(tx._id.toString(), otp);
+
+    // ✅ Send OTP to user's email
+    const user = await User.findById(userId).select('email');
+    if (!user?.email)
+      return res.status(400).json({ error: 'User has no email' });
+
+    await transporter.sendMail({
+      from: process.env.SMTP_USER,
+      to: user.email,
+      subject: 'Withdrawal OTP Verification',
+      text: `Your OTP for withdrawing ${amount} ${currency.toUpperCase()} is ${otp}. It will expire in 5 minutes.`,
+    });
+
+    // ✅ auto-expire OTP
+    setTimeout(() => pendingOtps.delete(tx._id.toString()), 5 * 60 * 1000);
+
+    console.log('✅ Withdrawal created:', tx);
+    console.log('✅ OTP for', user.email, '=', otp);
+
+    res.json({ message: 'OTP sent to registered email', requestId: tx._id });
+  } catch (e) {
+    console.error('❌ Withdraw error:', e);
+    res.status(500).json({ error: e.message });
+  }
+}
+
+// Verify OTP & Execute Withdraw
+async function verifyWithdrawOtp(req, res) {
+  const { requestId, otp } = req.body;
+  if (!requestId || !otp)
+    return res.status(400).json({ error: 'requestId and otp required' });
+
+  try {
+    const storedOtp = pendingOtps.get(requestId);
+    console.log('🔍 Stored OTP:', storedOtp);
+
+    if (!storedOtp) return res.status(400).json({ error: 'OTP expired or invalid' });
+    if (storedOtp !== otp) return res.status(400).json({ error: 'Invalid OTP' });
+
+    const tx = await Transaction.findById(requestId);
+    console.log('🔍 Found transaction:', tx);
+
+    if (!tx) return res.status(404).json({ error: 'Transaction not found' });
+    if (tx.status !== 'pending') return res.status(400).json({ error: 'Invalid transaction' });
+
+    // ✅ simulate deduction
+    await svc.debitBalance(tx.userId, tx.currency, tx.amount);
+
+    tx.status = 'finished';
+    tx.txHash = 'local-withdraw-' + Date.now();
+    await tx.save();
+
+    pendingOtps.delete(requestId);
+    res.json({ message: 'Withdrawal successful', tx });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+}
+
+
+module.exports = { getCoins, getDepositAddress, getBalance, getTransactions, requestWithdraw, executeWithdraw, requestWithdrawOTP, verifyWithdrawOtp };

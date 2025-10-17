@@ -4,7 +4,7 @@ const express = require('express');
 const morgan = require('morgan');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const { connectDB } = require('./db/connection');
+const { connectDB } = require('../../shared/db/connection');
 
 const app = express();
 
@@ -24,8 +24,9 @@ app.use(morgan('dev'));
 
 // routes
 app.use('/api/wallet', require('./routes/wallet.routes'));
-app.use('/api', require('./routes/webhook.routes'));
+app.use('/api', require('./routes/webhook.routes')); //for confirmation for wallet balance update
 app.use("/api/slotgrator", require("./routes/slotgrator.routes"));
+app.use("/api/games", require("./routes/game.routes"));
 
 const PORT = process.env.PORT || 7012;
 

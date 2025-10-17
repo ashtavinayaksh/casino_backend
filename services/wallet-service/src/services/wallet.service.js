@@ -9,6 +9,27 @@ async function ensureWallet(userId) {
   return w;
 }
 
+async function debitBalance(userId, currency, amount) {
+  const wallet = await Wallet.findOne({ userId });
+  if (!wallet) throw new Error('Wallet not found');
+
+  const c = currency.toLowerCase();
+  const bal = wallet.balances.find(b => b.currency === c);
+  if (!bal || bal.amount < amount) throw new Error('Insufficient funds');
+
+  bal.amount -= amount;
+  await wallet.save();
+
+  await Transaction.create({
+    userId,
+    type: 'withdraw',
+    currency: c,
+    amount,
+    status: 'finished',
+    metadata: { method: 'manual' },
+  });
+}
+
 async function getOrCreateDepositAddress({ userId, currency, nowpApiKey, ipnUrl }) {
   const c = currency.toLowerCase();
   let rec = await PaymentAddress.findOne({ userId, currency: c });
@@ -91,6 +112,7 @@ async function getBalance(userId) {
 
 module.exports = {
   ensureWallet,
+  debitBalance,
   getOrCreateDepositAddress,
   creditDeposit,
   requestWithdraw,

@@ -1,4 +1,4 @@
-const { mongoose } = require('../db/connection');
+const { mongoose } = require('../../../shared/db/connection');
 
 
 const PaymentAddressSchema = new mongoose.Schema({
