@@ -6,7 +6,6 @@ const { connectDB } = require('@casino/shared/db/connection');
 const routes = require('./routes/auth.routes');
 
 const app = express();
-connectDB(process.env.MONGO_URI);
 app.use(cors());
 app.use(express.json());
 const PORT = process.env.PORT || 4000;
