@@ -6,7 +6,14 @@ const { connectDB } = require('@casino/shared/db/connection');
 const routes = require('./routes/auth.routes');
 
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin: "*",
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
 app.use(express.json());
 const PORT = process.env.PORT || 4000;
 
