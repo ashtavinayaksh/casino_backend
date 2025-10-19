@@ -19,6 +19,7 @@ const UserSchema = new mongoose.Schema({
     enum: ["none", "pending", "approved", "rejected"],
     default: "none",
   },
+  emailVerified: { type: Boolean, default: false },
   createdAt: { type: Date, default: () => new Date() },
 });
 
