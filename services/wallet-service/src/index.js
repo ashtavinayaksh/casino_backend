@@ -21,7 +21,9 @@ app.use((req, res, next) => {
 
 app.use(
   cors({
-    origin: "*",
+    origin: [
+      "https://moonbet-casino.vercel.app/",
+    ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })

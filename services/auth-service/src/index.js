@@ -8,7 +8,9 @@ const routes = require('./routes/auth.routes');
 const app = express();
 app.use(
   cors({
-    origin: "*",
+    origin: [
+      "https://moonbet-casino.vercel.app/",
+    ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
