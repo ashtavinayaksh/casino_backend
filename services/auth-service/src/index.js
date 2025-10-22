@@ -15,8 +15,8 @@ const routes = require('./routes/auth.routes');
 
 const app = express();
 
-app.use(cleanCorsHeaders);
 app.use(corsMiddleware);
+app.use(cleanCorsHeaders);
 app.use(helmetMiddleware);
 app.use(express.json({ limit: "10mb" }));
 app.use(sanitizeMiddleware);
