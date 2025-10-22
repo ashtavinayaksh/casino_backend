@@ -4,7 +4,7 @@ const express = require('express');
 const morgan = require('morgan');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const { connectDB } = require('@casino/shared/db/connection');
+const { connectDB } = require('../../shared/db/connection');
 const {
   cleanCorsHeaders,
   corsMiddleware,
