@@ -14,6 +14,7 @@ function cleanCorsHeaders(req, res, next) {
 const allowedOrigins = [
   'https://moonbet-casino.vercel.app',
   'https://moonbet-casino.vercel.app/',
+  'https://casino.zazu.games',
   'https://casino.zazu.games/',
   'http://localhost:5173',
   'http://localhost:3000',
