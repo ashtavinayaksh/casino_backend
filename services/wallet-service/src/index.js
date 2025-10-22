@@ -31,18 +31,6 @@ app.use((req, res, next) => {
     next();
   });
 });
-
-app.use(
-  cors({
-    origin: [
-      "https://moonbet-casino.vercel.app",
-      "http://localhost:5173",
-    ],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  })
-);
 app.use(morgan('dev'));
 
 // routes

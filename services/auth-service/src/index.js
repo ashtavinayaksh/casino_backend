@@ -29,7 +29,7 @@ const PORT = process.env.PORT || 4000;
     // await initRedis(process.env.REDIS_URL || 'redis://localhost:6379');
 
     app.use('/api/auth', routes);             // ✅ Register routes after DB connects
-    // app.get('/healthz', (req, res) => res.json({ ok: true }));
+    app.get('/healthz', (req, res) => res.json({ ok: true }));
 
     app.listen(PORT, () => console.log(`Auth service running on ${PORT}`));
   } catch (e) {
