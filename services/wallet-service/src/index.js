@@ -5,8 +5,21 @@ const morgan = require('morgan');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const { connectDB } = require('@casino/shared/db/connection');
+const {
+  corsMiddleware,
+  helmetMiddleware,
+  compressionMiddleware,
+  sanitizeMiddleware,
+  hppMiddleware,
+} = require('./middleware/security');
 
 const app = express();
+app.use(helmetMiddleware);
+app.use(corsMiddleware);
+app.use(express.json({ limit: '10mb' }));
+app.use(sanitizeMiddleware);
+app.use(hppMiddleware);
+app.use(compressionMiddleware);
 
 // capture raw body for HMAC verification
 app.use((req, res, next) => {
