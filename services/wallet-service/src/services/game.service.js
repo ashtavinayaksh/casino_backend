@@ -8,6 +8,12 @@ const MERCHANT_KEY = process.env.SLOTEGRATOR_MERCHANT_KEY || "23d43f20b489421a5e
 
 console.log("env data are:", API_URL, MERCHANT_ID, MERCHANT_KEY);
 
+const axiosInstance = axios.create({
+  baseURL: API_URL,
+  timeout: 10000, // 10 seconds max wait
+});
+
+
 /**
  * Generate signature headers for Slotgrator API requests.
  */
@@ -123,7 +129,7 @@ async function initGame({
   const payload = new URLSearchParams(requestParams);
 
   try {
-    const res = await axios.post(endpoint, payload, { headers });
+    const res = await axiosInstance.post(endpoint, payload, { headers });
     console.log("✅ /games/init Response:", res.status, res.data);
     return res.data;
   } catch (err) {
@@ -185,7 +191,7 @@ async function initDemoGame({ game_uuid, device, language, return_url }) {
   const payload = new URLSearchParams(requestParams);
 
   try {
-    const res = await axios.post(endpoint, payload, { headers });
+    const res = await axiosInstance.post(endpoint, payload, { headers });
     console.log("✅ /games/init-demo Response:", res.status, res.data);
     return res.data;
   } catch (err) {
