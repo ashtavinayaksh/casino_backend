@@ -13,6 +13,7 @@ async function connectDB() {
       serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
       connectTimeoutMS: 15000,
+      dbName: "casino_wallets",
     });
 
     console.log(`✅ MongoDB connected: ${conn.connection.host}/${conn.connection.name}`);
