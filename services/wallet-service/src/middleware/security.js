@@ -5,6 +5,12 @@ const compression = require('compression');
 const mongoSanitize = require('express-mongo-sanitize');
 const hpp = require('hpp');
 
+function cleanCorsHeaders(req, res, next) {
+  res.removeHeader("Access-Control-Allow-Origin");
+  res.removeHeader("Access-Control-Allow-Credentials");
+  next();
+}
+
 const allowedOrigins = [
   'https://moonbet-casino.vercel.app',
   'https://moonbet-casino.vercel.app/',
@@ -54,6 +60,7 @@ const hppMiddleware = hpp();
  * Export all middlewares
  */
 module.exports = {
+  cleanCorsHeaders,
   corsMiddleware,
   helmetMiddleware,
   compressionMiddleware,

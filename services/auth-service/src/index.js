@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { connectDB } = require('@casino/shared/db/connection');
 const {
+  cleanCorsHeaders,
   corsMiddleware,
   helmetMiddleware,
   compressionMiddleware,
@@ -13,9 +14,11 @@ const {
 const routes = require('./routes/auth.routes');
 
 const app = express();
-app.use(helmetMiddleware);
+
+app.use(cleanCorsHeaders);
 app.use(corsMiddleware);
-app.use(express.json({ limit: '10mb' }));
+app.use(helmetMiddleware);
+app.use(express.json({ limit: "10mb" }));
 app.use(sanitizeMiddleware);
 app.use(hppMiddleware);
 app.use(compressionMiddleware);
