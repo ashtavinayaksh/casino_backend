@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 async function connectDB() {
   try {
-    const uri = 'mongodb+srv://ashtavinayakcasino:ashtavinayakcasino@cluster0.1xwmd3c.mongodb.net/casino_wallets?retryWrites=true&w=majority&appName=Cluster0';
+    const uri = 'mongodb+srv://ashtavinayakcasino:ashtavinayakcasino@cluster0.1xwmd3c.mongodb.net/casino_wallets?appName=mongosh+2.5.8';
 
     mongoose.set("strictQuery", true);
 
