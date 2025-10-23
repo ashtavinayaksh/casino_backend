@@ -145,33 +145,40 @@ async function initGame({
 async function initDemoGame({ game_uuid, device, language, return_url }) {
   const endpoint = `${API_URL}/games/init-demo`;
 
-  const params = {
-    game_uuid,
-    device: device || "desktop",
-    language: language || "en",
-    return_url: return_url || "https://moonbet-casino.vercel.app/game-return",
-  };
-
   const timestamp = Math.floor(Date.now() / 1000);
   const nonce = Math.random().toString(36).substring(2, 14);
 
-  const signatureParams = {
-    "x-merchant-id": MERCHANT_ID,
-    "x-nonce": nonce,
-    "x-timestamp": timestamp,
-    ...params,
+  // Build request parameters
+  const requestParams = {
+    game_uuid,
+    device: device || "desktop",
+    language: language || "en",
+    return_url: return_url || "https://yourdomain.com/game-return",
   };
 
-  const sorted = Object.keys(signatureParams)
-    .sort()
-    .reduce((acc, key) => {
-      acc[key] = signatureParams[key];
-      return acc;
-    }, {});
+  // Merge headers + params for signature
+  const headersParams = {
+    "X-Merchant-Id": MERCHANT_ID,
+    "X-Nonce": nonce,
+    "X-Timestamp": timestamp,
+  };
 
-  const queryString = new URLSearchParams(sorted).toString();
+  const allParams = { ...requestParams, ...headersParams };
+
+  // Sort all keys alphabetically
+  const sortedKeys = Object.keys(allParams).sort();
+  const sortedObject = {};
+  sortedKeys.forEach((key) => (sortedObject[key] = allParams[key]));
+
+  // Build query string and signature
+  const queryString = new URLSearchParams(sortedObject).toString();
   const xSign = crypto.createHmac("sha1", MERCHANT_KEY).update(queryString).digest("hex");
 
+  console.log("🎮 initDemoGame() request:", endpoint);
+  console.log("🔹 Sorted String to Sign:", queryString);
+  console.log("🔹 X-Sign:", xSign);
+
+  // Headers
   const headers = {
     "Content-Type": "application/x-www-form-urlencoded",
     "X-Merchant-Id": MERCHANT_ID,
@@ -180,23 +187,14 @@ async function initDemoGame({ game_uuid, device, language, return_url }) {
     "X-Sign": xSign,
   };
 
-  const payload = new URLSearchParams(params);
+  const payload = new URLSearchParams(requestParams);
 
   try {
-    console.log("🎮 POST:", endpoint);
-    console.log("🔹 Payload:", payload.toString());
-    console.log("🔹 Sign String:", queryString);
-    console.log("🔹 X-Sign:", xSign);
-
-    const res = await axiosInstance.post(endpoint, payload, { headers });
-    console.log("✅ Response:", res.status, res.data);
+    const res = await axios.post(endpoint, payload, { headers, timeout: 10000 });
+    console.log("✅ /games/init-demo Response:", res.status, res.data);
     return res.data;
   } catch (err) {
-    console.error("❌ initDemoGame() Error:", {
-      status: err.response?.status,
-      data: err.response?.data,
-      message: err.message,
-    });
+    console.error("❌ initDemoGame() Error:", err.response?.status, err.response?.data || err.message);
     throw new Error(err.response?.data?.message || "Slotgrator API error");
   }
 }
