@@ -10,7 +10,7 @@ console.log("env data are:", API_URL, MERCHANT_ID, MERCHANT_KEY);
 
 const axiosInstance = axios.create({
   baseURL: API_URL,
-  timeout: 10000, // 10 seconds max wait
+  timeout: 8000, // 8 seconds max wait
 });
 
 
