@@ -3,7 +3,7 @@ const gameService = require("../services/game.service");
 exports.getGames = async (req, res) => {
   try {
     const games = await gameService.listGames();
-    console.log("games are:", games)
+    // console.log("games are:", games)
     res.json({ games });
   } catch (err) {
     console.error("❌ Error fetching games:", err.message);

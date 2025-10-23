@@ -8,10 +8,7 @@ const MERCHANT_KEY = process.env.SLOTEGRATOR_MERCHANT_KEY || "23d43f20b489421a5e
 
 console.log("env data are:", API_URL, MERCHANT_ID, MERCHANT_KEY);
 
-const axiosInstance = axios.create({
-  baseURL: API_URL,
-  timeout: 8000, // 8 seconds max wait
-});
+const axiosInstance = axios.create({ timeout: 8000 });
 
 
 /**
@@ -190,7 +187,9 @@ async function initDemoGame({ game_uuid, device, language, return_url }) {
   const payload = new URLSearchParams(requestParams);
 
   try {
-    const res = await axios.post(endpoint, payload, { headers, timeout: 10000 });
+    console.log("🛰 Sending request to Slotgrator...");
+    const res = await axiosInstance.post(endpoint, payload, { headers });
+    console.log("✅ Slotgrator response received");
     console.log("✅ /games/init-demo Response:", res.status, res.data);
     return res.data;
   } catch (err) {
