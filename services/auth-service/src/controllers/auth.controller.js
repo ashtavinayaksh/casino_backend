@@ -3,6 +3,8 @@ const { generateToken } = require('../utils/jwt');
 const { ethers } = require('ethers');
 const nodemailer = require('nodemailer');
 const bcrypt = require('bcrypt');
+const speakeasy = require("speakeasy");
+const QRCode = require("qrcode");
 
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -367,5 +369,85 @@ exports.verifyEmail = async (req, res) => {
   } catch (e) {
     console.error("❌ verifyEmail error:", e);
     res.status(500).json({ error: e.message });
+  }
+};
+
+
+/**
+ * Enable Two-Factor Authentication
+ * Generates a secret and otpauth URL for Google Authenticator
+ */
+exports.enableTwoFactor = async (req, res) => {
+  try {
+    const { userId } = req.body; // frontend should send logged-in user's id
+
+    if (!userId) return res.status(400).json({ error: "User ID is required" });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // Generate a new TOTP secret
+    const secret = speakeasy.generateSecret({
+      name: `MoonBet:${user.email || user.username}`,
+      issuer: "MoonBet",
+      length: 20,
+    });
+
+    // Store the base32 secret temporarily (user confirms via verify-2fa)
+    user.twoFactorTempSecret = secret.base32;
+    await user.save();
+
+    // Optionally generate a QR code (frontend already does it, but backend can too)
+    const otpauthUrl = secret.otpauth_url;
+    const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
+
+    res.json({
+      secret: secret.base32,
+      otpauthUrl,
+      qrCodeDataUrl,
+      message: "2FA secret generated. Please verify with your authenticator code.",
+    });
+  } catch (err) {
+    console.error("❌ enableTwoFactor error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * Verify Two-Factor Authentication code
+ */
+exports.verifyTwoFactor = async (req, res) => {
+  try {
+    const { userId, token } = req.body;
+    if (!userId || !token)
+      return res.status(400).json({ error: "User ID and token are required" });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const secret = user.twoFactorTempSecret || user.twoFactorSecret;
+    if (!secret) return res.status(400).json({ error: "2FA secret not set. Please enable 2FA first." });
+
+    const verified = speakeasy.totp.verify({
+      secret,
+      encoding: "base32",
+      token,
+      window: 1, // allows ±30s tolerance
+    });
+
+    if (!verified) return res.status(400).json({ error: "Invalid or expired 2FA code." });
+
+    // If temp secret verified successfully, mark 2FA as enabled
+    if (user.twoFactorTempSecret) {
+      user.twoFactorSecret = user.twoFactorTempSecret;
+      user.twoFactorTempSecret = null;
+      user.isTwoFactorEnabled = true;
+      await user.save();
+    }
+
+    res.json({ success: true, message: "✅ Two-Factor Authentication enabled successfully." });
+  } catch (err) {
+    console.error("❌ verifyTwoFactor error:", err);
+    res.status(500).json({ error: err.message });
   }
 };

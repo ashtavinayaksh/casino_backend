@@ -20,7 +20,9 @@
     "hpp": "^0.2.3",
     "jsonwebtoken": "^9.0.0",
     "mongoose": "^7.0.0",
-    "nodemailer": "^7.0.9"
+    "nodemailer": "^7.0.9",
+    "qrcode": "^1.5.4",
+    "speakeasy": "^2.0.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.20"

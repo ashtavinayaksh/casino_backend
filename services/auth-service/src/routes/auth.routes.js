@@ -7,6 +7,8 @@ r.post('/siwe', c.siwe);
 r.get('/profile/:idOrUsername', c.getProfile);
 r.post('/change-password', c.changePassword);
 r.post('/forgot-password', c.forgotPassword);
-r.post('/send-otp', c.sendOtp);       // ⬅️ NEW
+r.post('/send-otp', c.sendOtp);
 r.post('/verify-email', c.verifyEmail);
+r.post('/enable-2fa', c.enableTwoFactor);   // Generate secret + QR URL
+r.post('/verify-2fa', c.verifyTwoFactor);   // Verify 6-digit token
 module.exports = r;

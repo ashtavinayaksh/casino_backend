@@ -20,6 +20,9 @@ const UserSchema = new mongoose.Schema({
     default: "none",
   },
   emailVerified: { type: Boolean, default: false },
+  twoFactorSecret: { type: String, default: null },
+  twoFactorTempSecret: { type: String, default: null },
+  isTwoFactorEnabled: { type: Boolean, default: false },
   createdAt: { type: Date, default: () => new Date() },
 });
 
