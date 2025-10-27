@@ -12,10 +12,16 @@ async function ensureWallet(userId, currency) {
   return wallet;
 }
 
-exports.getUserBalance = async (player_id) => {
+exports.getUserBalance = async (player_id, currency) => {
   const user = await Wallet.findOne({ userId: player_id });
-  return user ? user.balance : 0;
+  if (!user || !Array.isArray(user.balances)) return 0;
+
+  const bal = user.balances.find(b => 
+    b.currency.toLowerCase() === currency.toLowerCase()
+  );
+  return bal ? bal.amount : 0;
 };
+
 
 exports.handleBet = async (data) => {
   const { player_id, amount, currency, transaction_id, game_uuid } = data;

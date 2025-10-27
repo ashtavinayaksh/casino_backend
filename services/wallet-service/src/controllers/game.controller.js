@@ -145,7 +145,7 @@ exports.callbackHandler = async (req, res) => {
 
     switch (action) {
       case "balance":
-        return res.json({ balance: await getUserBalance(req.body.player_id) });
+        return res.json({ balance: await getUserBalance(req.body.player_id, req.body.currency) });
       case "bet":
         return res.json(await handleBet(req.body));
       case "win":
