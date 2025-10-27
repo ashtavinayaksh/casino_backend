@@ -10,4 +10,6 @@ router.post("/:uuid/init", ctrl.initGame);
 // POST /api/games/:uuid/init-demo
 router.post("/:uuid/init-demo", ctrl.initDemoGame);
 
+router.post("/callback", ctrl.callbackHandler);
+
 module.exports = router;
