@@ -7,6 +7,7 @@ const {
   handleRollback,
   getUserBalance,
 } = require("../services/callbackHandlers");
+const verifyCallbackSignature = require("../utils/verifyCallbackSignature");
 
 const MERCHANT_KEY = process.env.SLOTEGRATOR_MERCHANT_KEY;
 
@@ -154,7 +155,8 @@ function verifySignature(req) {
 
 exports.callbackHandler = async (req, res) => {
   try {
-    if (!verifySignature(req)) {
+    const isValid = verifyCallbackSignature(req, MERCHANT_KEY);
+    if (!isValid) {
       return res.status(403).json({ error_code: "INVALID_SIGNATURE" });
     }
 
@@ -178,8 +180,10 @@ exports.callbackHandler = async (req, res) => {
     }
   } catch (err) {
     console.error("❌ Callback Handler Error:", err.message);
-    res
-      .status(500)
-      .json({ error_code: "INTERNAL_ERROR", message: err.message });
+    res.status(500).json({
+      error_code: "INTERNAL_ERROR",
+      message: err.message,
+    });
   }
 };
+
