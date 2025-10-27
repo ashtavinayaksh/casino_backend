@@ -36,7 +36,7 @@ exports.getUserBalance = async (player_id, requestedCurrency = "USD") => {
     return 0;
   }
 
-  // collect all crypto symbols for conversion
+  // ✅ ignore requestedCurrency completely and always calculate total USD equivalent
   const symbols = wallet.balances.map((b) => b.currency.toUpperCase());
   const rates = await getUsdRates(symbols);
 
@@ -52,6 +52,7 @@ exports.getUserBalance = async (player_id, requestedCurrency = "USD") => {
 
   return Number(totalUsd.toFixed(2)); // always return USD equivalent
 };
+
 
 /**
  * Helper to update a specific crypto balance

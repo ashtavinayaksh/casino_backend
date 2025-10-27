@@ -1,6 +1,12 @@
 const crypto = require("crypto");
 const gameService = require("../services/game.service");
-const { handleBet, handleWin, handleRefund, handleRollback, getUserBalance } = require("../services/callbackHandlers");
+const {
+  handleBet,
+  handleWin,
+  handleRefund,
+  handleRollback,
+  getUserBalance,
+} = require("../services/callbackHandlers");
 
 const MERCHANT_KEY = process.env.SLOTEGRATOR_MERCHANT_KEY;
 
@@ -25,15 +31,16 @@ exports.initGame = async (req, res) => {
       device,
       return_url,
       language,
-    //   session_id,
+      //   session_id,
       email,
     } = req.body;
 
     // ✅ Validate required fields
-    if (!uuid || !player_id || !currency ) {
+    if (!uuid || !player_id || !currency) {
       return res.status(400).json({
         success: false,
-        error: "Missing required fields: game_uuid, player_id, currency, or session_id",
+        error:
+          "Missing required fields: game_uuid, player_id, currency, or session_id",
       });
     }
 
@@ -51,7 +58,7 @@ exports.initGame = async (req, res) => {
       device,
       language,
       return_url,
-    //   session_id,
+      //   session_id,
       email,
     });
 
@@ -61,10 +68,14 @@ exports.initGame = async (req, res) => {
       data: result,
     });
   } catch (err) {
-    console.error("❌ Error initializing game:", err.response?.data || err.message);
+    console.error(
+      "❌ Error initializing game:",
+      err.response?.data || err.message
+    );
     res.status(500).json({
       success: false,
-      error: err.response?.data?.message || err.message || "Internal Server Error",
+      error:
+        err.response?.data?.message || err.message || "Internal Server Error",
     });
   }
 };
@@ -87,15 +98,16 @@ exports.initDemoGame = async (req, res) => {
       data: result,
     });
   } catch (err) {
-    console.error("❌ Error initializing demo game:", err.response?.data || err.message);
+    console.error(
+      "❌ Error initializing demo game:",
+      err.response?.data || err.message
+    );
     res.status(500).json({
       success: false,
       error: err.response?.data?.message || err.message,
     });
   }
 };
-
-
 
 /**
  * Verify X-Sign exactly the same way as Slotgrator & simulateCallbacks.js
@@ -118,16 +130,22 @@ function verifySignature(req) {
 
   // sort all keys alphabetically
   const sortedKeys = Object.keys(combined).sort();
-  const query = sortedKeys.map(k => `${k}=${combined[k]}`).join("&");
+  const query = sortedKeys.map((k) => `${k}=${combined[k]}`).join("&");
 
-  const calcSign = crypto.createHmac("sha1", MERCHANT_KEY)
+  const calcSign = crypto
+    .createHmac("sha1", MERCHANT_KEY)
     .update(query)
     .digest("hex");
 
   const valid = calcSign === headers["X-Sign"];
 
   if (!valid) {
-    console.error("❌ Invalid signature!\nExpected:", calcSign, "\nReceived:", headers["X-Sign"]);
+    console.error(
+      "❌ Invalid signature!\nExpected:",
+      calcSign,
+      "\nReceived:",
+      headers["X-Sign"]
+    );
     console.error("🔹 String used to sign:", query);
   }
 
@@ -145,7 +163,8 @@ exports.callbackHandler = async (req, res) => {
 
     switch (action) {
       case "balance":
-        return res.json({ balance: await getUserBalance(req.body.player_id, req.body.currency) });
+        const usdBalance = await getUserBalance(req.body.player_id, "USD");
+        return res.json({ balance: usdBalance });
       case "bet":
         return res.json(await handleBet(req.body));
       case "win":
@@ -159,7 +178,8 @@ exports.callbackHandler = async (req, res) => {
     }
   } catch (err) {
     console.error("❌ Callback Handler Error:", err.message);
-    res.status(500).json({ error_code: "INTERNAL_ERROR", message: err.message });
+    res
+      .status(500)
+      .json({ error_code: "INTERNAL_ERROR", message: err.message });
   }
 };
-
