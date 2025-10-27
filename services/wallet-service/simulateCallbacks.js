@@ -11,7 +11,7 @@ const axios = require("axios");
 const crypto = require("crypto");
 
 // ====== CONFIG ======
-const CALLBACK_URL = "http://localhost:4001/api/games/callback"; // change to your deployed URL if needed
+const CALLBACK_URL = "https://mapi.examtree.ai/wallet-service/api/games/callback";
 const MERCHANT_ID = "d81db2e9c9b7a35ddf0db4c2f1c3d288";
 const MERCHANT_KEY = "23d43f20b489421a5e802ee58f32f2db6c10b516";
 const PLAYER_ID = "68eb94c22a7983ea19b0bd6a";
