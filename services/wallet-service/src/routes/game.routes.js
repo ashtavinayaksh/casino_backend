@@ -12,4 +12,10 @@ router.post("/:uuid/init-demo", ctrl.initDemoGame);
 
 router.post("/callback", ctrl.callbackHandler);
 
+// Bet history - all users
+router.get("/bets", ctrl.getAllBets);
+
+// Bet history - specific user
+router.get("/bets/:userId", ctrl.getUserBets);
+
 module.exports = router;

@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const GameTransaction = require("../models/Transaction");
 const gameService = require("../services/game.service");
 const {
   handleBet,
@@ -154,3 +155,79 @@ exports.callbackHandler = async (req, res) => {
   }
 };
 
+
+// ==========================================================
+// 🧾 1️⃣ All Bets (admin / public feed)
+// ==========================================================
+exports.getAllBets = async (req, res) => {
+  try {
+    const { limit = 50 } = req.query; // optional pagination
+    const bets = await GameTransaction.find({ type: { $in: ["bet", "win", "refund", "rollback"] } })
+      .sort({ createdAt: -1 })
+      .limit(Number(limit));
+
+    // Format for frontend
+    const formatted = bets.map((b) => ({
+      game: b.game_uuid || "Unknown",
+      user: `Player***${b.userId?.slice(-3) || "XXX"}`,
+      betAmount: `${b.amount?.toFixed(2)} ${b.currency?.toUpperCase()}`,
+      multiplier: b.metadata?.multiplier ? `${b.metadata.multiplier.toFixed(2)}x` : null,
+      payout:
+        b.type === "win"
+          ? `+${b.amount?.toFixed(2)} ${b.currency?.toUpperCase()}`
+          : b.type === "bet"
+          ? `-${b.amount?.toFixed(2)} ${b.currency?.toUpperCase()}`
+          : b.type === "refund" || b.type === "rollback"
+          ? `+${b.amount?.toFixed(2)} ${b.currency?.toUpperCase()}`
+          : "0",
+      color:
+        b.type === "win" || b.type === "refund" || b.type === "rollback"
+          ? "green"
+          : "red",
+      time: "Just now", // frontend can format `b.createdAt`
+    }));
+
+    res.json({ success: true, count: formatted.length, data: formatted });
+  } catch (err) {
+    console.error("❌ getAllBets Error:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// ==========================================================
+// 🧾 2️⃣ Bets for specific user
+// ==========================================================
+exports.getUserBets = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { limit = 50 } = req.query;
+
+    const bets = await GameTransaction.find({
+      userId,
+      type: { $in: ["bet", "win", "refund", "rollback"] },
+    })
+      .sort({ createdAt: -1 })
+      .limit(Number(limit));
+
+    const formatted = bets.map((b) => ({
+      game: b.game_uuid || "Unknown",
+      type: b.type,
+      amount: `${b.amount?.toFixed(2)} ${b.currency?.toUpperCase()}`,
+      balanceAfter: b.balance_after || 0,
+      payout:
+        b.type === "win"
+          ? `+${b.amount?.toFixed(2)} ${b.currency?.toUpperCase()}`
+          : b.type === "bet"
+          ? `-${b.amount?.toFixed(2)} ${b.currency?.toUpperCase()}`
+          : b.type === "refund" || b.type === "rollback"
+          ? `+${b.amount?.toFixed(2)} ${b.currency?.toUpperCase()}`
+          : "0",
+      createdAt: b.createdAt,
+    }));
+
+    res.json({ success: true, count: formatted.length, data: formatted });
+  } catch (err) {
+    console.error("❌ getUserBets Error:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
