@@ -1,46 +1,31 @@
-// src/utils/verifyCallbackSignature.js
 const crypto = require("crypto");
 
 function verifyCallbackSignature(req, merchantKey) {
-  try {
-    const merchantId = req.headers["x-merchant-id"];
-    const nonce = req.headers["x-nonce"];
-    const timestamp = req.headers["x-timestamp"];
-    const receivedSign = req.headers["x-sign"];
+  const headers = {
+    "X-Merchant-Id": req.header("X-Merchant-Id"),
+    "X-Timestamp": req.header("X-Timestamp"),
+    "X-Nonce": req.header("X-Nonce"),
+  };
+  const receivedSign = req.header("X-Sign");
+  console.log("headers for verifySign:", headers);
 
-    // combine for signing
-    const combined = {
-      ...req.body,
-      "X-Merchant-Id": merchantId,
-      "X-Nonce": nonce,
-      "X-Timestamp": timestamp,
-    };
+  const merged = { ...req.body, ...headers };
+  const sorted = Object.keys(merged)
+    .sort()
+    .reduce((obj, key) => ({ ...obj, [key]: merged[key] }), {});
+  const query = new URLSearchParams(sorted).toString();
 
-    // sort keys alphabetically
-    const sortedKeys = Object.keys(combined).sort();
-    const query = sortedKeys.map(k => `${k}=${combined[k]}`).join("&");
+  const expected = crypto.createHmac("sha1", merchantKey).update(query).digest("hex");
 
-    // compute sign
-    const calcSign = crypto.createHmac("sha1", merchantKey)
-      .update(query)
-      .digest("hex");
-
-    const valid = calcSign === receivedSign;
-
-    if (!valid) {
-      console.error("❌ Invalid signature!");
-      console.error("Expected:", calcSign);
-      console.error("Received:", receivedSign);
-      console.error("🔹 String used to sign:", query);
-    } else {
-      console.log("✅ Signature verified successfully");
-    }
-
-    return valid;
-  } catch (err) {
-    console.error("❌ Signature verification error:", err.message);
+  if (expected !== receivedSign) {
+    console.error("❌ Invalid signature!");
+    console.log("Expected:", expected);
+    console.log("Received:", receivedSign);
+    console.log("🔹 String used to sign:", query);
     return false;
   }
+  console.log("headers for verifySign:", headers);
+  return true;
 }
 
 module.exports = verifyCallbackSignature;

@@ -3,7 +3,6 @@ const { mongoose } = require('../db/connection');
 const TransactionSchema = new mongoose.Schema({
   userId: { type: String, index: true },
 
-  // expanded enum for all possible transaction types
   type: { 
     type: String, 
     enum: ['deposit', 'withdraw', 'bet', 'win', 'refund', 'rollback'], 
@@ -20,13 +19,19 @@ const TransactionSchema = new mongoose.Schema({
     index: true 
   },
 
-  externalId: { type: String }, // NOWPayments payment_id or payout id
+  externalId: { type: String },
   txHash: { type: String },
   metadata: { type: Object },
 
-  // 🎮 Optional game-specific fields
+  // 🎮 game
   game_uuid: { type: String },
-  transaction_id: { type: String },
+
+  // Slotegrator's unique id for this operation - make unique
+  transaction_id: { type: String, unique: true, index: true },
+
+  // optional: reference a previous tx (e.g., refund pointing to bet)
+  ref_transaction_id: { type: String },
+
   balance_after: { type: Number },
 
   createdAt: { type: Date, default: () => new Date() },

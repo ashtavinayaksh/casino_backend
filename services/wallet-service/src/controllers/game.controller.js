@@ -110,63 +110,27 @@ exports.initDemoGame = async (req, res) => {
   }
 };
 
-/**
- * Verify X-Sign exactly the same way as Slotgrator & simulateCallbacks.js
- */
-function verifySignature(req) {
-  const headers = {
-    "X-Merchant-Id": req.headers["x-merchant-id"],
-    "X-Nonce": req.headers["x-nonce"],
-    "X-Timestamp": req.headers["x-timestamp"],
-    "X-Sign": req.headers["x-sign"],
-  };
-
-  // merge body + headers for signing
-  const combined = {
-    ...req.body,
-    "X-Merchant-Id": headers["X-Merchant-Id"],
-    "X-Nonce": headers["X-Nonce"],
-    "X-Timestamp": headers["X-Timestamp"],
-  };
-
-  // sort all keys alphabetically
-  const sortedKeys = Object.keys(combined).sort();
-  const query = sortedKeys.map((k) => `${k}=${combined[k]}`).join("&");
-
-  const calcSign = crypto
-    .createHmac("sha1", MERCHANT_KEY)
-    .update(query)
-    .digest("hex");
-
-  const valid = calcSign === headers["X-Sign"];
-
-  if (!valid) {
-    console.error(
-      "❌ Invalid signature!\nExpected:",
-      calcSign,
-      "\nReceived:",
-      headers["X-Sign"]
-    );
-    console.error("🔹 String used to sign:", query);
-  }
-
-  return valid;
-}
-
 exports.callbackHandler = async (req, res) => {
+  console.log("Callback incoming at /api/games/callback");
+  console.log("Headers:", req.headers);
+  console.log("Body:", req.body);
   try {
     const isValid = verifyCallbackSignature(req, MERCHANT_KEY);
+    console.log("Signature valid?", isValid);
     if (!isValid) {
       return res.status(403).json({ error_code: "INVALID_SIGNATURE" });
     }
 
-    const { action } = req.body;
+    const action = (req.body.action || "").toLowerCase();
     console.log("🎯 Callback received:", action);
 
     switch (action) {
-      case "balance":
-        const usdBalance = await getUserBalance(req.body.player_id, "USD");
-        return res.json({ balance: usdBalance });
+      case "balance": {
+  const { player_id } = req.body;
+  const bal = await getUserBalance(player_id, "SOL");
+  console.log("✅ Returning balance", bal);
+  return res.json({ balance: Number(bal.toFixed(2)) });
+}
       case "bet":
         return res.json(await handleBet(req.body));
       case "win":
@@ -180,10 +144,6 @@ exports.callbackHandler = async (req, res) => {
     }
   } catch (err) {
     console.error("❌ Callback Handler Error:", err.message);
-    res.status(500).json({
-      error_code: "INTERNAL_ERROR",
-      message: err.message,
-    });
+    res.status(500).json({ error_code: "INTERNAL_ERROR", message: err.message });
   }
 };
-

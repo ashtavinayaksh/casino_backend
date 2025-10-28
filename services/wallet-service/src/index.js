@@ -21,6 +21,7 @@ const app = express();
 app.use(corsMiddleware);
 app.use(cleanCorsHeaders);
 app.use(helmetMiddleware);
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json({ limit: "10mb" }));
 app.use(sanitizeMiddleware);
 app.use(hppMiddleware);

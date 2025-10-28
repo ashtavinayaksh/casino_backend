@@ -1,191 +1,304 @@
+// services/callbackHandlers.js
+const mongoose = require("mongoose");
 const Wallet = require("../models/Wallet");
 const GameTransaction = require("../models/Transaction");
-const { getUsdRates } = require("../lib/price");
 
-/**
- * Ensure wallet exists and has the currency field
- */
+/* -------------------- HELPER FUNCTIONS -------------------- */
+
+// ensure wallet + currency row
 async function ensureWallet(userId, currency) {
+  const cur = (currency || "SOL").toLowerCase();
   let wallet = await Wallet.findOne({ userId });
   if (!wallet) {
     wallet = await Wallet.create({
       userId,
-      balances: [{ currency: currency.toLowerCase(), amount: 0 }],
+      balances: [{ currency: cur, amount: 0, locked: 0 }],
     });
   }
 
   if (!Array.isArray(wallet.balances)) wallet.balances = [];
 
-  let entry = wallet.balances.find(
-    (b) => b.currency.toLowerCase() === currency.toLowerCase()
-  );
+  let entry = wallet.balances.find((b) => b.currency.toLowerCase() === cur);
   if (!entry) {
-    entry = { currency: currency.toLowerCase(), amount: 0 };
+    entry = { currency: cur, amount: 0, locked: 0 };
     wallet.balances.push(entry);
+    await wallet.save();
   }
 
   return wallet;
 }
 
-/**
- * Return total wallet balance converted to USD (aggregated)
- */
-exports.getUserBalance = async (player_id, requestedCurrency = "USD") => {
-  const wallet = await Wallet.findOne({ userId: player_id });
-  if (!wallet || !Array.isArray(wallet.balances) || wallet.balances.length === 0) {
+async function findBalanceEntry(wallet, currency) {
+  return wallet.balances.find(
+    (b) => (b.currency || "").toLowerCase() === (currency || "SOL").toLowerCase()
+  );
+}
+
+// ===== Idempotency guard =====
+async function alreadyProcessed(txId) {
+  if (!txId) return false;
+  const existing = await GameTransaction.findOne({ transaction_id: txId });
+  return !!existing;
+}
+
+/* -------------------- NEW FUNCTION: getUserBalance -------------------- */
+exports.getUserBalance = async (player_id, currency = "SOL") => {
+  try {
+    const wallet = await Wallet.findOne({ userId: player_id });
+    if (!wallet) return 0;
+
+    const entry = wallet.balances.find(
+      (b) => (b.currency || "").toLowerCase() === currency.toLowerCase()
+    );
+
+    // default to 0 if not found
+    return entry ? Number(entry.amount || 0) : 0;
+  } catch (err) {
+    console.error("❌ getUserBalance error:", err.message);
     return 0;
   }
+};
 
-  // Always compute total USD equivalent, ignoring requestedCurrency
-  const symbols = wallet.balances.map((b) => b.currency.toUpperCase());
-  const rates = await getUsdRates(symbols);
+/* -------------------- BET -------------------- */
+exports.handleBet = async (data) => {
+  const { player_id, amount, currency = "SOL", transaction_id, game_uuid } = data;
+  const cur = currency.toUpperCase();
+  const amt = Number(amount || 0);
+  if (amt <= 0) return { error_code: "INVALID_AMOUNT" };
 
-  let totalUsd = 0;
-  for (const entry of wallet.balances) {
-    let b = entry;
-    if (typeof b === "string") {
-      try {
-        b = JSON.parse(b);
-      } catch (e) {
-        continue;
-      }
+  if (await alreadyProcessed(transaction_id)) {
+    const curBal = await exports.getUserBalance(player_id, cur);
+    return { balance: Number(curBal.toFixed(2)), transaction_id };
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const wallet = await ensureWallet(player_id, cur);
+    const entry = await findBalanceEntry(wallet, cur);
+
+    if ((entry.amount || 0) < amt) {
+      await session.abortTransaction();
+      session.endSession();
+      return { error_code: "INSUFFICIENT_FUNDS" };
     }
 
-    const rate = rates[b.currency.toUpperCase()] || 1;
-    totalUsd += (Number(b.amount) || 0) * rate;
-  }
+    // move to locked
+    entry.amount -= amt;
+    entry.locked += amt;
+    await wallet.save({ session });
 
-  return Number(totalUsd.toFixed(2));
+    const newBal = entry.amount;
+
+    await GameTransaction.create(
+      [
+        {
+          userId: player_id,
+          transaction_id,
+          game_uuid,
+          amount: amt,
+          currency: cur,
+          type: "bet",
+          status: "confirmed",
+          balance_after: newBal,
+        },
+      ],
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return { balance: Number(newBal.toFixed(2)), transaction_id };
+  } catch (e) {
+    await session.abortTransaction();
+    session.endSession();
+    if (e.code === 11000) {
+      const curBal = await exports.getUserBalance(player_id, cur);
+      return { balance: Number(curBal.toFixed(2)), transaction_id };
+    }
+    throw e;
+  }
 };
 
-/**
- * Internal: update wallet currency balance
- */
-async function updateBalance(player_id, currency, delta) {
-  const wallet = await ensureWallet(player_id, currency);
-  const entry = wallet.balances.find(
-    (b) => b.currency.toLowerCase() === currency.toLowerCase()
-  );
-  if (!entry) throw new Error("Currency not found in wallet");
-
-  entry.amount = Number(entry.amount) + Number(delta);
-  await wallet.save();
-  return wallet;
-}
-
-/**
- * Internal: create transaction log
- */
-async function createGameTx({
-  player_id,
-  amount,
-  currency,
-  game_uuid,
-  transaction_id,
-  type,
-  balance_after_usd,
-}) {
-  await GameTransaction.create({
-    userId: player_id,
-    transaction_id,
-    game_uuid,
-    amount: Number(amount),
-    currency,
-    type,
-    balance_after: balance_after_usd,
-    status: "confirmed",
-  });
-}
-
-/**
- * BET (subtract crypto, return USD balance)
- */
-exports.handleBet = async (data) => {
-  const { player_id, amount, currency, transaction_id, game_uuid } = data;
-
-  const currentUsd = await exports.getUserBalance(player_id, "USD");
-  if (currentUsd < amount) {
-    return { error_code: "INSUFFICIENT_FUNDS" };
-  }
-
-  await updateBalance(player_id, currency, -amount);
-  const newUsd = await exports.getUserBalance(player_id, "USD");
-
-  await createGameTx({
-    player_id,
-    amount,
-    currency,
-    game_uuid,
-    transaction_id,
-    type: "bet",
-    balance_after_usd: newUsd,
-  });
-
-  return { balance: newUsd, transaction_id: `BET_${transaction_id}` };
-};
-
-/**
- * WIN (+amount)
- */
+/* -------------------- WIN -------------------- */
 exports.handleWin = async (data) => {
-  const { player_id, amount, currency, transaction_id, game_uuid } = data;
+  const { player_id, amount, currency = "SOL", transaction_id, game_uuid } = data;
+  const cur = currency.toUpperCase();
+  const amt = Number(amount || 0);
+  if (amt < 0) return { error_code: "INVALID_AMOUNT" };
 
-  await updateBalance(player_id, currency, amount);
-  const newUsd = await exports.getUserBalance(player_id, "USD");
+  if (await alreadyProcessed(transaction_id)) {
+    const curBal = await exports.getUserBalance(player_id, cur);
+    return { balance: Number(curBal.toFixed(2)), transaction_id };
+  }
 
-  await createGameTx({
-    player_id,
-    amount,
-    currency,
-    game_uuid,
-    transaction_id,
-    type: "win",
-    balance_after_usd: newUsd,
-  });
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const wallet = await ensureWallet(player_id, cur);
+    const entry = await findBalanceEntry(wallet, cur);
 
-  return { balance: newUsd, transaction_id: `WIN_${transaction_id}` };
+    entry.amount += amt;
+    await wallet.save({ session });
+
+    const newBal = entry.amount;
+
+    await GameTransaction.create(
+      [
+        {
+          userId: player_id,
+          transaction_id,
+          game_uuid,
+          amount: amt,
+          currency: cur,
+          type: "win",
+          status: "confirmed",
+          balance_after: newBal,
+        },
+      ],
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return { balance: Number(newBal.toFixed(2)), transaction_id };
+  } catch (e) {
+    await session.abortTransaction();
+    session.endSession();
+    if (e.code === 11000) {
+      const curBal = await exports.getUserBalance(player_id, cur);
+      return { balance: Number(curBal.toFixed(2)), transaction_id };
+    }
+    throw e;
+  }
 };
 
-/**
- * REFUND (+amount)
- */
+/* -------------------- REFUND -------------------- */
 exports.handleRefund = async (data) => {
-  const { player_id, amount, currency, transaction_id, game_uuid } = data;
-
-  await updateBalance(player_id, currency, amount);
-  const newUsd = await exports.getUserBalance(player_id, "USD");
-
-  await createGameTx({
+  const {
     player_id,
     amount,
-    currency,
-    game_uuid,
+    currency = "SOL",
     transaction_id,
-    type: "refund",
-    balance_after_usd: newUsd,
-  });
+    game_uuid,
+    ref_transaction_id,
+  } = data;
+  const cur = currency.toUpperCase();
+  const amt = Number(amount || 0);
+  if (amt <= 0) return { error_code: "INVALID_AMOUNT" };
 
-  return { balance: newUsd, transaction_id: `REF_${transaction_id}` };
+  if (await alreadyProcessed(transaction_id)) {
+    const curBal = await exports.getUserBalance(player_id, cur);
+    return { balance: Number(curBal.toFixed(2)), transaction_id };
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const wallet = await ensureWallet(player_id, cur);
+    const entry = await findBalanceEntry(wallet, cur);
+
+    const release = Math.min(entry.locked || 0, amt);
+    entry.locked -= release;
+    entry.amount += amt;
+    await wallet.save({ session });
+
+    const newBal = entry.amount;
+
+    await GameTransaction.create(
+      [
+        {
+          userId: player_id,
+          transaction_id,
+          ref_transaction_id,
+          game_uuid,
+          amount: amt,
+          currency: cur,
+          type: "refund",
+          status: "confirmed",
+          balance_after: newBal,
+        },
+      ],
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return { balance: Number(newBal.toFixed(2)), transaction_id };
+  } catch (e) {
+    await session.abortTransaction();
+    session.endSession();
+    if (e.code === 11000) {
+      const curBal = await exports.getUserBalance(player_id, cur);
+      return { balance: Number(curBal.toFixed(2)), transaction_id };
+    }
+    throw e;
+  }
 };
 
-/**
- * ROLLBACK (+amount)
- */
+/* -------------------- ROLLBACK -------------------- */
 exports.handleRollback = async (data) => {
-  const { player_id, amount, currency, transaction_id, game_uuid } = data;
-
-  await updateBalance(player_id, currency, amount);
-  const newUsd = await exports.getUserBalance(player_id, "USD");
-
-  await createGameTx({
+  const {
     player_id,
     amount,
-    currency,
-    game_uuid,
+    currency = "SOL",
     transaction_id,
-    type: "rollback",
-    balance_after_usd: newUsd,
-  });
+    game_uuid,
+    ref_transaction_id,
+  } = data;
+  const cur = currency.toUpperCase();
+  const amt = Number(amount || 0);
+  if (amt <= 0) return { error_code: "INVALID_AMOUNT" };
 
-  return { balance: newUsd, transaction_id: `ROLL_${transaction_id}` };
+  if (await alreadyProcessed(transaction_id)) {
+    const curBal = await exports.getUserBalance(player_id, cur);
+    return { balance: Number(curBal.toFixed(2)), transaction_id };
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const wallet = await ensureWallet(player_id, cur);
+    const entry = await findBalanceEntry(wallet, cur);
+
+    const release = Math.min(entry.locked || 0, amt);
+    entry.locked -= release;
+    entry.amount += amt;
+    await wallet.save({ session });
+
+    const newBal = entry.amount;
+
+    await GameTransaction.create(
+      [
+        {
+          userId: player_id,
+          transaction_id,
+          ref_transaction_id,
+          game_uuid,
+          amount: amt,
+          currency: cur,
+          type: "rollback",
+          status: "confirmed",
+          balance_after: newBal,
+        },
+      ],
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return { balance: Number(newBal.toFixed(2)), transaction_id };
+  } catch (e) {
+    await session.abortTransaction();
+    session.endSession();
+    if (e.code === 11000) {
+      const curBal = await exports.getUserBalance(player_id, cur);
+      return { balance: Number(curBal.toFixed(2)), transaction_id };
+    }
+    throw e;
+  }
 };

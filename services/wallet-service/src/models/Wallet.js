@@ -1,8 +1,10 @@
+// models/Wallet.js
 const { mongoose } = require('../db/connection');
 
 const BalanceSchema = new mongoose.Schema({
   currency: { type: String, index: true },
-  amount: { type: Number, default: 0 },
+  amount: { type: Number, default: 0 },   // available
+  locked: { type: Number, default: 0 },   // in-play
 }, { _id: false });
 
 const WalletSchema = new mongoose.Schema({
@@ -15,7 +17,7 @@ const WalletSchema = new mongoose.Schema({
 WalletSchema.methods.getBalance = function (currency) {
   const c = currency.toLowerCase();
   let row = this.balances.find(b => b.currency === c);
-  if (!row) { row = { currency: c, amount: 0 }; this.balances.push(row); }
+  if (!row) { row = { currency: c, amount: 0, locked: 0 }; this.balances.push(row); }
   return row;
 };
 
