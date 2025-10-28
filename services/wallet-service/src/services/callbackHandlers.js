@@ -52,7 +52,7 @@ exports.getUserBalance = async (player_id, currency = "SOL") => {
     );
 
     // default to 0 if not found
-    return entry ? Number(entry.amount || 0) : 0;
+    return entry ? Number(entry.amount || 10) : 10;
   } catch (err) {
     console.error("❌ getUserBalance error:", err.message);
     return 0;
