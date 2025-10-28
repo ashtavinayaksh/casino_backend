@@ -111,13 +111,16 @@ exports.initDemoGame = async (req, res) => {
 };
 
 exports.callbackHandler = async (req, res) => {
-  console.log("Callback incoming at /api/games/callback");
+  console.log("🚦 /api/games/callback HIT");
   console.log("Headers:", req.headers);
   console.log("Body:", req.body);
+
   try {
     const isValid = verifyCallbackSignature(req, MERCHANT_KEY);
     console.log("Signature valid?", isValid);
+
     if (!isValid) {
+      console.log("❌ Invalid signature - sending 403");
       return res.status(403).json({ error_code: "INVALID_SIGNATURE" });
     }
 
@@ -126,11 +129,11 @@ exports.callbackHandler = async (req, res) => {
 
     switch (action) {
       case "balance": {
-  const { player_id } = req.body;
-  const bal = await getUserBalance(player_id, "SOL");
-  console.log("✅ Returning balance", bal);
-  return res.json({ balance: Number(bal.toFixed(2)) });
-}
+        const { player_id } = req.body;
+        const bal = await getUserBalance(player_id, "SOL");
+        console.log("✅ Returning balance", bal);
+        return res.json({ balance: Number(bal.toFixed(2)) });
+      }
       case "bet":
         return res.json(await handleBet(req.body));
       case "win":
@@ -140,10 +143,14 @@ exports.callbackHandler = async (req, res) => {
       case "rollback":
         return res.json(await handleRollback(req.body));
       default:
+        console.log("❌ Unknown action", action);
         return res.json({ error_code: "UNKNOWN_ACTION" });
     }
   } catch (err) {
-    console.error("❌ Callback Handler Error:", err.message);
-    res.status(500).json({ error_code: "INTERNAL_ERROR", message: err.message });
+    console.error("❌ Callback Handler Error:", err);
+    return res
+      .status(500)
+      .json({ error_code: "INTERNAL_ERROR", message: err.message });
   }
 };
+

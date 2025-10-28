@@ -2,11 +2,12 @@ const crypto = require("crypto");
 
 function verifyCallbackSignature(req, merchantKey) {
   const headers = {
-    "X-Merchant-Id": req.header("X-Merchant-Id"),
-    "X-Timestamp": req.header("X-Timestamp"),
-    "X-Nonce": req.header("X-Nonce"),
+    "X-Merchant-Id": req.headers["x-merchant-id"],
+    "X-Timestamp": req.headers["x-timestamp"],
+    "X-Nonce": req.headers["x-nonce"],
   };
-  const receivedSign = req.header("X-Sign");
+  const receivedSign = req.headers["x-sign"];
+
   console.log("headers for verifySign:", headers);
 
   const merged = { ...req.body, ...headers };
@@ -18,13 +19,12 @@ function verifyCallbackSignature(req, merchantKey) {
   const expected = crypto.createHmac("sha1", merchantKey).update(query).digest("hex");
 
   if (expected !== receivedSign) {
-    console.error("❌ Invalid signature!");
+    console.log("❌ Invalid signature!");
     console.log("Expected:", expected);
     console.log("Received:", receivedSign);
     console.log("🔹 String used to sign:", query);
     return false;
   }
-  console.log("headers for verifySign:", headers);
   return true;
 }
 
