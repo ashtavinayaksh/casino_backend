@@ -10,6 +10,8 @@ const BalanceSchema = new mongoose.Schema({
 const WalletSchema = new mongoose.Schema({
   userId: { type: String, unique: true, index: true },
   gameCurrency: { type: String, default: "USD" },
+  preferredCurrency: { type: String, default: "SOL" },
+  betCurrency: { type: String, default: "USD" },
   balances: { type: [BalanceSchema], default: [] },
   createdAt: { type: Date, default: () => new Date() },
   updatedAt: { type: Date, default: () => new Date() },
