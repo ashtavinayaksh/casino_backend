@@ -42,7 +42,7 @@ async function alreadyProcessed(txId) {
 }
 
 /* -------------------- NEW FUNCTION: getUserBalance -------------------- */
-exports.getUserBalance = async (player_id, currency = "SOL") => {
+exports.getUserBalance = async (player_id, currency = "USD") => {
   try {
     const wallet = await Wallet.findOne({ userId: player_id });
     if (!wallet) return 0;
@@ -61,7 +61,7 @@ exports.getUserBalance = async (player_id, currency = "SOL") => {
 
 /* -------------------- BET -------------------- */
 exports.handleBet = async (data) => {
-  const { player_id, amount, currency = "SOL", transaction_id, game_uuid } = data;
+  const { player_id, amount, currency = "USD", transaction_id, game_uuid } = data;
   const cur = currency.toUpperCase();
   const amt = Number(amount || 0);
   if (amt <= 0) return { error_code: "INVALID_AMOUNT" };
@@ -123,7 +123,7 @@ exports.handleBet = async (data) => {
 
 /* -------------------- WIN -------------------- */
 exports.handleWin = async (data) => {
-  const { player_id, amount, currency = "SOL", transaction_id, game_uuid } = data;
+  const { player_id, amount, currency = "USD", transaction_id, game_uuid } = data;
   const cur = currency.toUpperCase();
   const amt = Number(amount || 0);
   if (amt < 0) return { error_code: "INVALID_AMOUNT" };
@@ -180,7 +180,7 @@ exports.handleRefund = async (data) => {
   const {
     player_id,
     amount,
-    currency = "SOL",
+    currency = "USD",
     transaction_id,
     game_uuid,
     ref_transaction_id,
@@ -244,7 +244,7 @@ exports.handleRollback = async (data) => {
   const {
     player_id,
     amount,
-    currency = "SOL",
+    currency = "USD",
     transaction_id,
     game_uuid,
     ref_transaction_id,

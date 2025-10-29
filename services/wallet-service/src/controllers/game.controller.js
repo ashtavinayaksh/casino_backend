@@ -131,7 +131,7 @@ exports.callbackHandler = async (req, res) => {
     switch (action) {
       case "balance": {
         const { player_id } = req.body;
-        const bal = await getUserBalance(player_id, "SOL");
+        const bal = await getUserBalance(player_id, "USD");
         console.log("✅ Returning balance", bal);
         return res.json({ balance: Number(bal.toFixed(2)) });
       }
@@ -155,23 +155,37 @@ exports.callbackHandler = async (req, res) => {
   }
 };
 
-
 // ==========================================================
-// 🧾 1️⃣ All Bets (admin / public feed)
+// 🧾 1️⃣ All Bets (with game name)
 // ==========================================================
 exports.getAllBets = async (req, res) => {
   try {
-    const { limit = 50 } = req.query; // optional pagination
-    const bets = await GameTransaction.find({ type: { $in: ["bet", "win", "refund", "rollback"] } })
+    const { limit = 50 } = req.query;
+
+    // 1️⃣ Get all games to map UUID → name
+    const gameData = await gameService.listGames();
+    const uuidToName = {};
+    if (gameData?.games?.items?.length) {
+      for (const g of gameData.games.items) {
+        uuidToName[g.uuid] = g.name;
+      }
+    }
+
+    // 2️⃣ Fetch bet-related transactions
+    const bets = await GameTransaction.find({
+      type: { $in: ["bet", "win", "refund", "rollback"] },
+    })
       .sort({ createdAt: -1 })
       .limit(Number(limit));
 
-    // Format for frontend
+    // 3️⃣ Format output
     const formatted = bets.map((b) => ({
-      game: b.game_uuid || "Unknown",
+      game: uuidToName[b.game_uuid] || "Unknown Game",
       user: `Player***${b.userId?.slice(-3) || "XXX"}`,
       betAmount: `${b.amount?.toFixed(2)} ${b.currency?.toUpperCase()}`,
-      multiplier: b.metadata?.multiplier ? `${b.metadata.multiplier.toFixed(2)}x` : null,
+      multiplier: b.metadata?.multiplier
+        ? `${b.metadata.multiplier.toFixed(2)}x`
+        : null,
       payout:
         b.type === "win"
           ? `+${b.amount?.toFixed(2)} ${b.currency?.toUpperCase()}`
@@ -184,7 +198,7 @@ exports.getAllBets = async (req, res) => {
         b.type === "win" || b.type === "refund" || b.type === "rollback"
           ? "green"
           : "red",
-      time: "Just now", // frontend can format `b.createdAt`
+      time: "Just now",
     }));
 
     res.json({ success: true, count: formatted.length, data: formatted });
@@ -195,12 +209,20 @@ exports.getAllBets = async (req, res) => {
 };
 
 // ==========================================================
-// 🧾 2️⃣ Bets for specific user
+// 🧾 2️⃣ Bets for specific user (with game name)
 // ==========================================================
 exports.getUserBets = async (req, res) => {
   try {
     const { userId } = req.params;
     const { limit = 50 } = req.query;
+
+    const gameData = await gameService.listGames();
+    const uuidToName = {};
+    if (gameData?.games?.items?.length) {
+      for (const g of gameData.games.items) {
+        uuidToName[g.uuid] = g.name;
+      }
+    }
 
     const bets = await GameTransaction.find({
       userId,
@@ -210,7 +232,7 @@ exports.getUserBets = async (req, res) => {
       .limit(Number(limit));
 
     const formatted = bets.map((b) => ({
-      game: b.game_uuid || "Unknown",
+      game: uuidToName[b.game_uuid] || "Unknown Game",
       type: b.type,
       amount: `${b.amount?.toFixed(2)} ${b.currency?.toUpperCase()}`,
       balanceAfter: b.balance_after || 0,
@@ -231,3 +253,4 @@ exports.getUserBets = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
