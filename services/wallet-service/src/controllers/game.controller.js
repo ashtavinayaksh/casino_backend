@@ -11,6 +11,8 @@ const {
 const verifyCallbackSignature = require("../utils/verifyCallbackSignature");
 
 const MERCHANT_KEY = process.env.SLOTEGRATOR_MERCHANT_KEY;
+const DEFAULT_CURRENCY = (process.env.DEFAULT_CURRENCY || "USD").toUpperCase();
+const normalizeCurrency = (c) => (c || DEFAULT_CURRENCY).toString().trim().toUpperCase();
 
 exports.getGames = async (req, res) => {
   try {
