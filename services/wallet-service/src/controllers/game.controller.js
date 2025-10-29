@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const GameTransaction = require("../models/Transaction");
+const Wallet = require("../models/Wallet");
 const gameService = require("../services/game.service");
 const {
   handleBet,
@@ -9,6 +10,9 @@ const {
   getUserBalance,
 } = require("../services/callbackHandlers");
 const verifyCallbackSignature = require("../utils/verifyCallbackSignature");
+
+const UPPER = (c) => (c || "").toString().trim().toUpperCase();
+const LOWER = (c) => UPPER(c).toLowerCase();
 
 const MERCHANT_KEY = process.env.SLOTEGRATOR_MERCHANT_KEY;
 const DEFAULT_CURRENCY = (process.env.DEFAULT_CURRENCY || "USD").toUpperCase();
@@ -112,6 +116,46 @@ exports.initDemoGame = async (req, res) => {
     });
   }
 };
+
+exports.setGameCurrency = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    let { currency } = req.body;
+
+    if (!userId) return res.status(400).json({ success: false, message: "userId required" });
+    if (!currency) return res.status(400).json({ success: false, message: "currency required" });
+
+    currency = UPPER(currency);
+    const curLower = LOWER(currency);
+
+    // upsert wallet + set gameCurrency (UPPERCASE)
+    let wallet = await Wallet.findOneAndUpdate(
+      { userId },
+      { $set: { gameCurrency: currency } },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    // ensure a balance row exists for the chosen currency (lowercase)
+    if (!wallet.balances.some(b => (b.currency || "") === curLower)) {
+      wallet.balances.push({ currency: curLower, amount: 0, locked: 0 });
+      await wallet.save();
+    }
+
+    return res.json({
+      success: true,
+      message: "Game currency updated",
+      data: {
+        userId: wallet.userId,
+        gameCurrency: wallet.gameCurrency,
+        balances: wallet.balances,
+      },
+    });
+  } catch (err) {
+    console.error("❌ setGameCurrency error:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 
 exports.callbackHandler = async (req, res) => {
   console.log("🚦 /api/games/callback HIT");

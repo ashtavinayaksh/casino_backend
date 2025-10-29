@@ -10,6 +10,8 @@ router.post("/:uuid/init", ctrl.initGame);
 // POST /api/games/:uuid/init-demo
 router.post("/:uuid/init-demo", ctrl.initDemoGame);
 
+router.put("/:userId/currency", ctrl.setGameCurrency);
+
 router.post("/callback", ctrl.callbackHandler);
 
 // Bet history - all users
