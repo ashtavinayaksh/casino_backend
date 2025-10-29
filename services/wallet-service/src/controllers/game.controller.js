@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const GameTransaction = require("../models/Transaction");
 const Wallet = require("../models/Wallet");
 const gameService = require("../services/game.service");
+const { getUsdRates } = require("../lib/price");
 const {
   handleBet,
   handleWin,
@@ -10,9 +11,14 @@ const {
   getUserBalance,
 } = require("../services/callbackHandlers");
 const verifyCallbackSignature = require("../utils/verifyCallbackSignature");
+const axios = require("axios");
 
 const UPPER = (c) => (c || "").toString().trim().toUpperCase();
 const LOWER = (c) => UPPER(c).toLowerCase();
+
+// Helper: detect crypto
+const CRYPTOS = ["BTC","ETH","SOL","USDT","BNB","XRP","ADA","DOGE","TRX","LTC","DOT","MATIC","AVAX","XLM","BCH"];
+const isCrypto = (sym) => CRYPTOS.includes(UPPER(sym));
 
 const MERCHANT_KEY = process.env.SLOTEGRATOR_MERCHANT_KEY;
 const DEFAULT_CURRENCY = (process.env.DEFAULT_CURRENCY || "USD").toUpperCase();
@@ -153,6 +159,103 @@ exports.setGameCurrency = async (req, res) => {
   } catch (err) {
     console.error("❌ setGameCurrency error:", err);
     return res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
+/**
+ * Convert user's preferredCurrency (from Wallet)
+ * to gameCurrency (target) using live or cached rates.
+ * Updates wallet betCurrency and balance values accordingly.
+ */
+exports.convertToGameCurrency = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { preferredCurrency, gameCurrency } = req.body;
+
+    if (!userId) return res.status(400).json({ success: false, message: "userId required" });
+    if (!preferredCurrency || !gameCurrency)
+      return res.status(400).json({ success: false, message: "preferredCurrency & gameCurrency required" });
+
+    const fromCur = UPPER(preferredCurrency);
+    const toCur = UPPER(gameCurrency);
+
+    let wallet = await Wallet.findOne({ userId });
+    if (!wallet) return res.status(404).json({ success: false, message: "Wallet not found" });
+
+    // Get user's amount in the source currency
+    const fromEntry = wallet.balances.find((b) => UPPER(b.currency) === fromCur);
+    const fromAmount = fromEntry ? Number(fromEntry.amount || 0) : 0;
+
+    if (fromAmount <= 0)
+      return res.status(400).json({ success: false, message: `No balance in ${fromCur}` });
+
+    // === Calculate conversion rate ===
+    let rate = 1;
+
+    if (isCrypto(fromCur) && isCrypto(toCur)) {
+      // crypto → crypto (via USD bridge)
+      const usdRates = await getUsdRates([fromCur, toCur]);
+      const fromUsd = usdRates[fromCur];
+      const toUsd = usdRates[toCur];
+      rate = fromUsd / toUsd;
+    } else if (isCrypto(fromCur) && !isCrypto(toCur)) {
+      // crypto → fiat
+      const usdRates = await getUsdRates([fromCur]);
+      const cryptoUsd = usdRates[fromCur];
+      const fxRes = await axios.get("https://open.er-api.com/v6/latest/USD");
+      const usdRatesFx = fxRes.data?.rates || {};
+      const usdToTarget = usdRatesFx[toCur] || 1;
+      rate = cryptoUsd * usdToTarget;
+    } else if (!isCrypto(fromCur) && isCrypto(toCur)) {
+      // fiat → crypto
+      const fxRes = await axios.get(`https://open.er-api.com/v6/latest/${fromCur}`);
+      const fxRates = fxRes.data?.rates || {};
+      const fiatToUsd = fxRates["USD"] ? 1 / fxRates["USD"] : 1; // if base not USD
+      const usdRates = await getUsdRates([toCur]);
+      const usdToCrypto = 1 / usdRates[toCur];
+      rate = fiatToUsd * usdToCrypto;
+    } else {
+      // fiat → fiat
+      const fxRes = await axios.get(`https://open.er-api.com/v6/latest/${fromCur}`);
+      const rates = fxRes.data?.rates || {};
+      rate = rates[toCur] || 1;
+    }
+
+    if (!rate || rate <= 0) {
+      console.warn(`⚠️ Missing exchange rate for ${fromCur} → ${toCur}. Using 1.`);
+      rate = 1;
+    }
+
+    // === Perform conversion ===
+    const convertedAmount = Number((fromAmount * rate).toFixed(2));
+
+    // update or insert target currency balance
+    let toEntry = wallet.balances.find((b) => UPPER(b.currency) === toCur);
+    if (!toEntry) {
+      wallet.balances.push({ currency: LOWER(toCur), amount: convertedAmount, locked: 0 });
+    } else {
+      toEntry.amount = convertedAmount;
+    }
+
+    wallet.betCurrency = toCur;
+    wallet.preferredCurrency = fromCur;
+    await wallet.save();
+
+    return res.json({
+      success: true,
+      message: `Converted ${fromAmount} ${fromCur} → ${convertedAmount} ${toCur}`,
+      data: {
+        userId: wallet.userId,
+        preferredCurrency: fromCur,
+        betCurrency: toCur,
+        rate,
+        balances: wallet.balances,
+      },
+    });
+  } catch (err) {
+    console.error("❌ convertToGameCurrency error:", err);
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 

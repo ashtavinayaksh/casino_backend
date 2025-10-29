@@ -12,6 +12,8 @@ router.post("/:uuid/init-demo", ctrl.initDemoGame);
 
 router.put("/:userId/currency", ctrl.setGameCurrency);
 
+router.put("/convert/:userId", ctrl.convertToGameCurrency);
+
 router.post("/callback", ctrl.callbackHandler);
 
 // Bet history - all users
