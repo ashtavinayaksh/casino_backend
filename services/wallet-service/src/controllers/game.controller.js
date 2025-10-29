@@ -128,25 +128,31 @@ exports.callbackHandler = async (req, res) => {
     }
 
     const action = (req.body.action || "").toLowerCase();
-    console.log("🎯 Callback received:", action);
+    const currency = (req.body.currency || DEFAULT_CURRENCY).toUpperCase();
+    console.log("🎯 Callback received:", action, "| Currency:", currency);
 
     switch (action) {
       case "balance": {
         const { player_id } = req.body;
-        const bal = await getUserBalance(player_id, "USD");
-        console.log("✅ Returning balance", bal);
-        return res.json({ balance: Number(bal.toFixed(2)) });
+        const bal = await getUserBalance(player_id, currency);
+        console.log(`✅ Returning ${currency} balance:`, bal);
+        return res.json({ balance: Number(bal.toFixed(2)), currency });
       }
+
       case "bet":
         return res.json(await handleBet(req.body));
+
       case "win":
         return res.json(await handleWin(req.body));
+
       case "refund":
         return res.json(await handleRefund(req.body));
+
       case "rollback":
         return res.json(await handleRollback(req.body));
+
       default:
-        console.log("❌ Unknown action", action);
+        console.log("❌ Unknown action:", action);
         return res.json({ error_code: "UNKNOWN_ACTION" });
     }
   } catch (err) {
@@ -156,6 +162,7 @@ exports.callbackHandler = async (req, res) => {
       .json({ error_code: "INTERNAL_ERROR", message: err.message });
   }
 };
+
 
 // ==========================================================
 // 🧾 1️⃣ All Bets (with game name)
