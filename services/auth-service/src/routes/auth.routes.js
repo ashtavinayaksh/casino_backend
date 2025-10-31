@@ -11,4 +11,6 @@ r.post('/send-otp', c.sendOtp);
 r.post('/verify-email', c.verifyEmail);
 r.post('/enable-2fa', c.enableTwoFactor);   // Generate secret + QR URL
 r.post('/verify-2fa', c.verifyTwoFactor);   // Verify 6-digit token
+r.post("/google", c.googleAuth);
+
 module.exports = r;

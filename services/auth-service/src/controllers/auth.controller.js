@@ -6,6 +6,10 @@ const bcrypt = require('bcrypt');
 const speakeasy = require("speakeasy");
 const QRCode = require("qrcode");
 
+const { OAuth2Client } = require("google-auth-library");
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
@@ -451,3 +455,55 @@ exports.verifyTwoFactor = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+
+/**
+ * Sign in with Google
+ */
+exports.googleAuth = async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: "Missing Google token" });
+
+    // ✅ Verify Google token
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { sub, email, name, picture } = payload;
+
+    // 🔎 Find or create user
+    let user = await User.findOne({ email });
+    if (!user) {
+      user = await User.create({
+        username: `google_${sub.slice(0, 6)}`,
+        email,
+        displayName: name,
+        profilePic: picture,
+        googleId: sub,
+      });
+    }
+
+    // 🧾 Generate our own JWT
+    const appToken = generateToken({ sub: user._id });
+
+    res.json({
+      success: true,
+      message: "Google login successful",
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        displayName: user.displayName,
+        profilePic: user.profilePic,
+      },
+      token: appToken,
+    });
+  } catch (err) {
+    console.error("❌ googleAuth error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
