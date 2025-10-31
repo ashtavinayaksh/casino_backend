@@ -410,3 +410,57 @@ exports.getUserBets = async (req, res) => {
   }
 };
 
+// ==========================================================
+// 🏆 3️⃣ Recent Wins (last N transactions)
+// ==========================================================
+exports.getRecentWins = async (req, res) => {
+  try {
+    const { limit = 20 } = req.query;
+
+    // Fetch latest "win" transactions
+    const recentWins = await GameTransaction.find({ type: "win" })
+      .sort({ createdAt: -1 })
+      .limit(Number(limit));
+
+    // Map UUID → Game Name
+    const gameData = await gameService.listGames();
+    const uuidToName = {};
+    if (gameData?.games?.items?.length) {
+      for (const g of gameData.games.items) {
+        uuidToName[g.uuid] = g.name;
+      }
+    }
+
+    // Format the response
+    const formatted = recentWins.map((tx) => ({
+      game: uuidToName[tx.game_uuid] || "Unknown Game",
+      user: `Player***${tx.userId?.slice(-3) || "XXX"}`,
+      amount: `${tx.amount?.toFixed(2)} ${tx.currency?.toUpperCase()}`,
+      balanceAfter: tx.balance_after || 0,
+      timeAgo: timeAgo(tx.createdAt),
+      color: "green",
+    }));
+
+    res.json({
+      success: true,
+      count: formatted.length,
+      data: formatted,
+    });
+  } catch (err) {
+    console.error("❌ getRecentWins Error:", err.message);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// Helper function to format time
+function timeAgo(date) {
+  const now = new Date();
+  const diffMs = now - new Date(date);
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? "s" : ""} ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours} hr${diffHours > 1 ? "s" : ""} ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+}

@@ -22,4 +22,7 @@ router.get("/bets", ctrl.getAllBets);
 // Bet history - specific user
 router.get("/bets/:userId", ctrl.getUserBets);
 
+// Recent Win
+router.get("/recent-wins", ctrl.getRecentWins);
+
 module.exports = router;
